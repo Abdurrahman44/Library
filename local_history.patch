@@ -1,0 +1,389 @@
+Index: src/main/java/com/example/cascade_delete_example/Entities/ExcelExporter.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/example/cascade_delete_example/Entities/ExcelExporter.java b/src/main/java/com/example/cascade_delete_example/Entities/ExcelExporter.java
+new file mode 100644
+--- /dev/null	(date 1708435816258)
++++ b/src/main/java/com/example/cascade_delete_example/Entities/ExcelExporter.java	(date 1708435816258)
+@@ -0,0 +1,55 @@
++package com.example.cascade_delete_example.Entities;
++
++import org.apache.poi.ss.usermodel.*;
++import org.apache.poi.xssf.usermodel.XSSFWorkbook;
++
++import java.io.FileOutputStream;
++import java.util.List;
++
++public class ExcelExporter {
++
++    public static void exportAuthorsToExcel(List<Author> authors, String excelFilePath) {
++        try (Workbook workbook = new XSSFWorkbook()) {
++            Sheet sheet = workbook.createSheet("Authors");
++
++            // Başlık satırı
++            Row headerRow = sheet.createRow(0);
++            headerRow.createCell(0).setCellValue("Author ID");
++            headerRow.createCell(1).setCellValue("Author Name");
++
++            // Veri satırları
++            int rowNum = 1;
++            for (Author author : authors) {
++                Row row = sheet.createRow(rowNum++);
++                row.createCell(0).setCellValue(author.getAuthorId());
++                row.createCell(1).setCellValue(author.getAuthorName());
++
++                // Author ile ilişkili Book verilerini ekle
++                List<Book> books = author.getBooks();
++                for (Book book : books) {
++                    Row bookRow = sheet.createRow(rowNum++);
++                    bookRow.createCell(2).setCellValue(book.getBookId());
++                    bookRow.createCell(3).setCellValue(book.getBookTitle());
++                    // Diğer book sütunlarını eklemeye devam et
++                }
++
++                // Author ile ilişkili AuthorBookDetails verilerini ekle
++                List<AuthorBookDetails> authorDetails = author.getAuthorDetails();
++                for (AuthorBookDetails details : authorDetails) {
++                    Row detailsRow = sheet.createRow(rowNum++);
++                    detailsRow.createCell(4).setCellValue(details.getId());
++                    detailsRow.createCell(5).setCellValue(details.getAdditionalDetails());
++                    // Diğer details sütunlarını eklemeye devam et
++                }
++            }
++
++            // Excel dosyasını kaydet
++            try (FileOutputStream fileOut = new FileOutputStream(excelFilePath)) {
++                workbook.write(fileOut);
++            }
++
++        } catch (Exception e) {
++            e.printStackTrace();
++        }
++    }
++}
+Index: src/main/java/com/example/cascade_delete_example/Controller/FileController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/example/cascade_delete_example/Controller/FileController.java b/src/main/java/com/example/cascade_delete_example/Controller/FileController.java
+--- a/src/main/java/com/example/cascade_delete_example/Controller/FileController.java	
++++ b/src/main/java/com/example/cascade_delete_example/Controller/FileController.java	(date 1708435443036)
+@@ -2,6 +2,7 @@
+ 
+ import com.example.cascade_delete_example.Service.FileService;
+ import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.MediaType;
+ import org.springframework.http.ResponseEntity;
+ 
+ import org.springframework.web.bind.annotation.PostMapping;
+@@ -18,14 +19,56 @@
+ 
+     @Autowired
+     private FileService fileService;
++    /**
++     * Verilen dosyanın türünü kontrol eder ve uygunsa kaydetme işlemi yapar.
++     *
++     * @param file Yüklenen dosya
++     * @return Dosya başarıyla yüklendiyse 200 OK, aksi takdirde uygun değilse 400 Bad Request veya 500 Internal Server Error
++     */
+ 
+     @PostMapping("/uploadFile")
+     public ResponseEntity<String> handleFileUpload(@RequestParam("file") MultipartFile file) {
+         try {
+-            fileService.saveFile(file);
+-            return ResponseEntity.ok("File uploaded successfully!");
++            if (isValidFileType(file.getContentType())) {
++                fileService.saveFile(file);
++                return ResponseEntity.ok("File uploaded successfully!");
++            }
+         } catch (IOException e) {
+-            return ResponseEntity.badRequest().body("Error uploading file: " + e.getMessage());
++            return ResponseEntity.status(500).body("Error uploading file");
+         }
++        return null;
+     }
+-}
+\ No newline at end of file
++
++
++    /**
++     * Verilen dosya türünün geçerli olup olmadığını kontrol eder.
++     *
++     * @param fileType Kontrol edilecek dosya türü
++     * @return Dosya türü geçerli ise true, aksi takdirde false döner
++     */
++    private Boolean isValidFileType(String fileType) {
++        try {
++            if (fileType != null) {
++                // MIME türlerini kontrol et
++                if (fileType.equals(MediaType.IMAGE_JPEG_VALUE) ||
++                        fileType.equals(MediaType.APPLICATION_PDF_VALUE) ||
++                        fileType.equals("application/msword") ||
++                        fileType.equals(MediaType.IMAGE_PNG_VALUE) ||
++                        fileType.equals("application/vnd.ms-excel") ||
++                        fileType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
++                    return true;
++                }
++            }
++        } catch (Exception e) {
++            // Hata durumunda false döndür
++            return false;
++        }
++
++        // Hiçbir koşul karşılanmazsa false döndür
++        return false;
++    }
++
++
++
++}
++
+Index: src/main/java/com/example/cascade_delete_example/Controller/AuthorController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/com/example/cascade_delete_example/Controller/AuthorController.java b/src/main/java/com/example/cascade_delete_example/Controller/AuthorController.java
+--- a/src/main/java/com/example/cascade_delete_example/Controller/AuthorController.java	
++++ b/src/main/java/com/example/cascade_delete_example/Controller/AuthorController.java	(date 1708458713033)
+@@ -1,10 +1,17 @@
+ package com.example.cascade_delete_example.Controller;
+ 
+ import com.example.cascade_delete_example.Entities.Author;
++import com.example.cascade_delete_example.Entities.AuthorBookDetails;
++import com.example.cascade_delete_example.Entities.Book;
+ import com.example.cascade_delete_example.Service.AuthorService;
++import org.apache.poi.ss.usermodel.Row;
++import org.apache.poi.ss.usermodel.Sheet;
++import org.apache.poi.ss.usermodel.Workbook;
++import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.web.bind.annotation.*;
+ 
++import java.io.FileOutputStream;
+ import java.util.List;
+ 
+ @RestController
+@@ -38,4 +45,66 @@
+     public void deleteAuthor(@PathVariable Long id) {
+         authorService.deleteAuthor(id);
+     }
++
++    @GetMapping("/exportToExcel")
++    public String exportToExcel() {
++        try {
++            List<Author> authors = authorService.getAllAuthors();//Bütün dosyayı çekiyorki Rahat bir şekilde verilerin hepsi elinde olsun
++            String excelFilePath = "D:/AuthorsData.xlsx";//Göndelileck dosyanın yolu ve ismi oluşturmasını sağlar
++
++            exportAuthorsToExcel(authors, excelFilePath);
++
++            return "Excel dosyası başarıyla oluşturuldu: " + excelFilePath;
++        } catch (Exception e) {
++            e.printStackTrace();
++            return "Excel dosyası oluşturulurken bir hata oluştu.";
++        }
++    }
++
++
++    public static void exportAuthorsToExcel(List<Author> authors, String excelFilePath) {
++        try (Workbook workbook = new XSSFWorkbook()) {
++            Sheet sheet = workbook.createSheet("Authors" );//İlk başta excel dosyası oluşturuluyor ve sayfa ksımına isim veriliyor.
++
++            // Başlık satırı
++            Row headerRow = sheet.createRow(0);//bailangıç satrının ne olması gerektiğine karar kılmış durumda
++            headerRow.createCell(0).setCellValue("Author Name");//başlangıç ismi
++            //headerRow.createCell(1).setCellValue("Author Name");//Başlangıç ism
++
++            // Veri satırları
++            int rowNum = 1;
++
++            for (Author author : authors) {
++                Row row = sheet.createRow(rowNum++);
++                row.createCell(0).setCellValue(author.getAuthorName());
++             //   row.createCell(1).setCellValue(author.getAuthorName());
++
++                // Author ile ilişkili Book verilerini ekle
++                List<Book> books = author.getBooks();
++                for (Book book : books) {
++                    Row bookRow = sheet.createRow(rowNum++);
++                    bookRow.createCell(2).setCellValue(book.getBookId());
++                    bookRow.createCell(3).setCellValue(book.getBookTitle());
++                    // Diğer book sütunlarını eklemeye devam et
++                }
++
++                // Author ile ilişkili AuthorBookDetails verilerini ekle
++                List<AuthorBookDetails> authorDetails = author.getAuthorDetails();
++                for (AuthorBookDetails details : authorDetails) {
++                    Row detailsRow = sheet.createRow(rowNum++);
++                    detailsRow.createCell(4).setCellValue(details.getId());
++                    detailsRow.createCell(5).setCellValue(details.getAdditionalDetails());
++                    // Diğer details sütunlarını eklemeye devam et
++                }
++            }
++
++            // Excel dosyasını kaydet
++            try (FileOutputStream fileOut = new FileOutputStream(excelFilePath)) {
++                workbook.write(fileOut);
++            }
++
++        } catch (Exception e) {
++            e.printStackTrace();
++        }
++    }
+ }
+\ No newline at end of file
+Index: src/main/resources/application.properties
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>ISO-8859-1
+===================================================================
+diff --git a/src/main/resources/application.properties b/src/main/resources/application.properties
+--- a/src/main/resources/application.properties	
++++ b/src/main/resources/application.properties	(date 1708459307887)
+@@ -1,7 +1,6 @@
+ spring.datasource.url=jdbc:postgresql://localhost:5432/d
+ spring.datasource.username=postgres
+ spring.datasource.password=123
+-#spring.jpa.properties.hibernate.default_schema=upg1
+ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+ spring.jpa.hibernate.ddl-auto=update
+ server.port=8085
+Index: src/test/java/com/example/cascade_delete_example/Repositories/FileControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/com/example/cascade_delete_example/Repositories/FileControllerTest.java b/src/test/java/com/example/cascade_delete_example/Repositories/FileControllerTest.java
+--- a/src/test/java/com/example/cascade_delete_example/Repositories/FileControllerTest.java	
++++ b/src/test/java/com/example/cascade_delete_example/Repositories/FileControllerTest.java	(date 1708190835256)
+@@ -1,29 +1,23 @@
+ package com.example.cascade_delete_example.Repositories;
+ 
+-import com.example.cascade_delete_example.Controller.BookController;
+ import com.example.cascade_delete_example.Entities.Book;
+ import org.junit.jupiter.api.Test;
+ import org.junit.jupiter.api.extension.ExtendWith;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+ import org.springframework.boot.test.context.SpringBootTest;
+-import org.springframework.http.MediaType;
+ import org.springframework.mock.web.MockMultipartFile;
+ import org.springframework.test.context.junit.jupiter.SpringExtension;
+ import org.springframework.test.web.servlet.MockMvc;
+ import org.springframework.test.web.servlet.ResultMatcher;
+ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+-import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+ import org.springframework.web.bind.annotation.PathVariable;
+ import org.springframework.web.bind.annotation.RequestBody;
+ 
+-import static org.springframework.data.jpa.domain.AbstractPersistable_.id;
+ import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+ 
+ @ExtendWith(SpringExtension.class)
+-@WebMvcTest(BookController.class)
+ @SpringBootTest
+ @AutoConfigureMockMvc
+ public class FileControllerTest {
+@@ -39,13 +33,7 @@
+         mockMvc.perform(MockMvcRequestBuilders.multipart("/api/upFile/uploadFile").file(file))
+                 .andExpect(status().isOk());
+     }
+-    @Test
+-    public void testsaveBook(@RequestBody Book updatedBook) throws Exception {
+-    //    Mock Book= new Book();
+-        String jsonRequestBody = "{ \"1\": \"123weqe\": }";
+-        mockMvc.perform(MockMvcRequestBuilders.post("/api/books/create").contentType(MediaType.APPLICATION_JSON).contentType(jsonRequestBody)).andExpect(MockMvcResultMatchers.status().isOk());
+ 
+-    }
+ 
+ 
+ }
+\ No newline at end of file
+Index: pom.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pom.xml b/pom.xml
+--- a/pom.xml	
++++ b/pom.xml	(date 1708435741383)
+@@ -52,6 +52,16 @@
+             <artifactId>spring-boot-starter-test</artifactId>
+             <scope>test</scope>
+         </dependency>
++        <dependency>
++            <groupId>org.apache.poi</groupId>
++            <artifactId>poi</artifactId>
++            <version>4.1.2</version>
++        </dependency>
++        <dependency>
++            <groupId>org.apache.poi</groupId>
++            <artifactId>poi-ooxml</artifactId>
++            <version>4.1.2</version>
++        </dependency>
+ 
+ <!--        &lt;!&ndash; JUnit 5 (Test framework) &ndash;&gt;-->
+ <!--        <dependency>-->
+diff --git a/AuthorsData.xlsx b/AuthorsData.xlsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..f266c2c738086c01d56d362d983f3382242873a3
+GIT binary patch
+literal 3355
+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
+Q_=W<1$>WhNl!Ukc0Ys-BS^xk5
+
