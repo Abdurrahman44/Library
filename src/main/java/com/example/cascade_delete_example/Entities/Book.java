@@ -32,6 +32,19 @@ public class Book {
             author.getBooks().remove(this);
         }
     }
+    @ManyToMany
+    @JoinTable(
+            name = "book_genres",
+            joinColumns = @JoinColumn(name = "book_id"),
+            inverseJoinColumns = @JoinColumn(name = "genre_id")
+    )
+    private List<Genre> genres = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "library_id")
+    private Library library;
+
+
     @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AuthorBookDetails> bookDetails = new ArrayList<>();
 

@@ -9,7 +9,7 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.example</groupId>
-    <artifactId>Cascade_delete_example</artifactId>
+    <artifactId>Library_Example</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>Cascade_delete_example</name>
     <description>Cascade_delete_example</description>

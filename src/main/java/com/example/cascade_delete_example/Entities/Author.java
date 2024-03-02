@@ -36,4 +36,8 @@ public class Author {
 
     @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AuthorBookDetails> authorDetails = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "library_id")
+    private Library library;
 }
